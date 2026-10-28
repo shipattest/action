@@ -1,0 +1,75 @@
+name: ShipAttest - CRA SBOM upload
+description: Generate a CycloneDX SBOM for a release and upload it to ShipAttest for EU Cyber Resilience Act vulnerability monitoring.
+branding:
+  icon: shield
+  color: purple
+
+inputs:
+  product:
+    description: Product identifier in ShipAttest (created on first upload).
+    required: true
+  version:
+    description: Release version.
+    required: false
+    default: ${{ github.ref_name }}
+  token:
+    description: ShipAttest API token (store it as a secret).
+    required: true
+  url:
+    description: ShipAttest server URL.
+    required: false
+    default: https://shipattest.com
+  path:
+    description: Directory to scan for lockfiles.
+    required: false
+    default: "."
+  sbom:
+    description: Upload this CycloneDX or SPDX JSON file instead of reading lockfiles (firmware, containers, Java, C/C++).
+    required: false
+    default: ""
+  name:
+    description: Product display name.
+    required: false
+    default: ""
+  with-usage:
+    description: Send short excerpts of where direct dependencies are imported, for AI triage.
+    required: false
+    default: "false"
+  include-dev:
+    description: Include development-only dependencies.
+    required: false
+    default: "false"
+  fail-on-exploited:
+    description: Fail the step when the release contains an actively exploited vulnerability.
+    required: false
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v7
+      with:
+        node-version: 24
+    - name: Upload SBOM to ShipAttest
+      shell: bash
+      # Inputs are passed through the environment, never interpolated into the script.
+      env:
+        SHIPATTEST_TOKEN: ${{ inputs.token }}
+        SHIPATTEST_URL: ${{ inputs.url }}
+        INPUT_PRODUCT: ${{ inputs.product }}
+        INPUT_VERSION: ${{ inputs.version }}
+        INPUT_PATH: ${{ inputs.path }}
+        INPUT_SBOM: ${{ inputs.sbom }}
+        INPUT_NAME: ${{ inputs.name }}
+        INPUT_WITH_USAGE: ${{ inputs.with-usage }}
+        INPUT_INCLUDE_DEV: ${{ inputs.include-dev }}
+        INPUT_FAIL_ON_EXPLOITED: ${{ inputs.fail-on-exploited }}
+        CLI: ${{ github.action_path }}/dist/shipattest.mjs
+      run: |
+        args=(upload "$INPUT_PATH" --product "$INPUT_PRODUCT" --version "$INPUT_VERSION")
+        [ -n "$INPUT_SBOM" ] && args+=(--sbom "$INPUT_SBOM")
+        [ -n "$INPUT_NAME" ] && args+=(--name "$INPUT_NAME")
+        [ "$INPUT_WITH_USAGE" = "true" ] && args+=(--with-usage)
+        [ "$INPUT_INCLUDE_DEV" = "true" ] && args+=(--include-dev)
+        [ "$INPUT_FAIL_ON_EXPLOITED" = "true" ] && args+=(--fail-on exploited)
+        node "$CLI" "${args[@]}"

@@ -1,0 +1,32 @@
+# Include this file and extend `.shipattest-upload` to upload an SBOM for every release.
+#
+#   include:
+#     - remote: "https://raw.githubusercontent.com/shipattest/action/main/gitlab/shipattest.gitlab-ci.yml"
+#   shipattest:
+#     extends: .shipattest-upload
+#     variables:
+#       SHIPATTEST_PRODUCT: smart-hub
+#       SHIPATTEST_URL: https://shipattest.com
+#     rules:
+#       - if: $CI_COMMIT_TAG
+#
+# Set SHIPATTEST_TOKEN as a masked CI/CD variable.
+
+.shipattest-upload:
+  image: node:24-alpine
+  stage: deploy
+  variables:
+    SHIPATTEST_PRODUCT: ""
+    SHIPATTEST_PATH: "."
+    SHIPATTEST_VERSION: ""
+    SHIPATTEST_SBOM: ""
+    SHIPATTEST_WITH_USAGE: "false"
+    SHIPATTEST_FAIL_ON_EXPLOITED: "false"
+    SHIPATTEST_CLI_PACKAGE: "@shipattest/cli"
+  script:
+    - |
+      set -- upload "$SHIPATTEST_PATH" --product "$SHIPATTEST_PRODUCT" --version "${SHIPATTEST_VERSION:-${CI_COMMIT_TAG:-$CI_COMMIT_SHORT_SHA}}"
+      [ -n "$SHIPATTEST_SBOM" ] && set -- "$@" --sbom "$SHIPATTEST_SBOM"
+      [ "$SHIPATTEST_WITH_USAGE" = "true" ] && set -- "$@" --with-usage
+      [ "$SHIPATTEST_FAIL_ON_EXPLOITED" = "true" ] && set -- "$@" --fail-on exploited
+      npx --yes "$SHIPATTEST_CLI_PACKAGE" "$@"
